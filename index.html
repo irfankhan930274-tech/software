@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Vehicle Manager Lite</title>
+    
+    <!-- React & Tailwind CSS -->
+    <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* Mobile Specific Resets */
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden; /* Prevents rubber-banding on iOS */
+            background-color: #f8fafc; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+        }
+        #root {
+            height: 100%;
+            width: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        }
+        
+        input, select, textarea { outline: none; }
+        input:focus, select:focus, textarea:focus { border-color: #2563eb; ring: 2px; }
+        
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Hide scrollbar for a clean mobile UI */
+        ::-webkit-scrollbar { display: none; }
+
+        /* Custom Security Spinner */
+        .security-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border-left-color: #2563eb; 
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Pin Dots */
+        .pin-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #e2e8f0;
+            transition: all 0.2s ease;
+        }
+        .pin-dot.filled {
+            background-color: #2563eb;
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div style="height:100vh; display:flex; justify-content:center; align-items:center;">
+            <div class="text-center">
+                <div class="security-spinner"></div>
+                <div style="color:#2563eb; font-weight:bold;">Loading App...</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        // --- ICONS ---
+        const Icons = {
+            Search: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
+            Car: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12a2 2 0 0 0 2 2h3a2 2 0 1 0 4 0h5a2 2 0 1 0 4 0z"></path><circle cx="7" cy="17" r="2"></circle><circle cx="17" cy="17" r="2"></circle></svg>,
+            ArrowDown: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>,
+            ArrowUp: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>,
+            Camera: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>,
+            Back: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>,
+            Trash: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>,
+            Edit: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
+            Lock: <svg width="48" height="48" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>,
+            Logout: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        };
+
+        // --- BACKEND BRIDGE ---
+        const API_URL = "https://script.google.com/macros/s/AKfycbyJLhb_pWEHwFt5qN5YRXhQ0bMA1oN_kFwrgRkxDrPL6SO2_I9G2kq7T6MvSJS1flCf/exec"; 
+
+        const runScript = async (action, payload = null) => {
+            if (!API_URL) throw new Error("Please set the API_URL.");
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: action, payload: payload })
+                });
+                const result = await response.json();
+                if (result.status === 'success') return result.data;
+                else throw new Error(result.message);
+            } catch (error) {
+                console.error("API Error:", error);
+                throw error;
+            }
+        };
+
+        function App() {
+            // --- MASTER PIN LOCK STATE ---
+            const [isLocked, setIsLocked] = React.useState(true);
+            const [masterPin, setMasterPin] = React.useState('');
+            
+            // --- APP STATE ---
+            const [view, setView] = React.useState('home'); 
+            const [loading, setLoading] = React.useState(true);
+            const [processing, setProcessing] = React.useState(false);
+            const [loadingMsg, setLoadingMsg] = React.useState('');
+            
+            const [vehicles, setVehicles] = React.useState([]);
+            const [searchQuery, setSearchQuery] = React.useState('');
+            const [selectedVehicle, setSelectedVehicle] = React.useState(null);
+            const [detailTab, setDetailTab] = React.useState('purchase'); 
+
+            // Form states
+            const initialForm = { vehicleId: '', number: '', model: '', partyType: 'Customer', dealerName: '', customerName: '', customerMobile: '', price: '', remarks: '', isEdit: false };
+            const [form, setForm] = React.useState(initialForm);
+            const [tempFile, setTempFile] = React.useState(null);
+            const [docName, setDocName] = React.useState('');
+            const [tempDocs, setTempDocs] = React.useState([]);
+
+            // --- INITIAL LOAD & VERIFY ---
+            React.useEffect(() => { 
+                const savedPin = localStorage.getItem('master_app_pin');
+                if (savedPin === '0001') {
+                    setIsLocked(false);
+                    loadData();
+                } else {
+                    setLoading(false); // Stop loading to show the lock screen
+                }
+            }, []);
+
+            // Auto-check PIN when typing
+            React.useEffect(() => {
+                if (masterPin.length === 4) {
+                    if (masterPin === '0001') {
+                        localStorage.setItem('master_app_pin', '0001');
+                        setIsLocked(false);
+                        loadData();
+                    } else {
+                        // Shake effect or just alert for wrong PIN
+                        alert("Incorrect PIN");
+                        setMasterPin('');
+                    }
+                }
+            }, [masterPin]);
+
+            const loadData = async () => {
+                setLoading(true);
+                try {
+                    const data = await runScript('getData');
+                    setVehicles(data && Array.isArray(data.vehicles) ? data.vehicles : []);
+                } catch(e) { 
+                    alert("Data Load Error: " + e.message);
+                    setVehicles([]);
+                }
+                setLoading(false);
+            };
+
+            const dealerSuggestions = [...new Set([
+                ...(vehicles || []).map(v => v.purchaseDealerName),
+                ...(vehicles || []).map(v => v.saleDealerName)
+            ])].filter(Boolean);
+
+            const handleMobile = (val, setter, formObj, key) => setter({...formObj, [key]: val.replace(/\D/g, '').slice(0,10)});
+            const handleFile = (e) => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => setTempFile(r.result); r.readAsDataURL(f); };
+            const addDoc = () => { if(docName && tempFile) { setTempDocs([...tempDocs, {name: docName, url: tempFile}]); setDocName(''); setTempFile(null); document.getElementById('fileInput').value = ""; } };
+            const delDoc = (i) => { const n=[...tempDocs]; n.splice(i,1); setTempDocs(n); };
+
+            const resetAndGoHome = async () => {
+                setForm(initialForm); setTempDocs([]); setDocName(''); setTempFile(null);
+                setView('home'); window.scrollTo(0, 0); await loadData();
+            };
+
+            const handleEdit = (v) => {
+                if (detailTab === 'purchase') {
+                    setForm({
+                        isEdit: true, vehicleId: v.id, number: v.number, model: v.model,
+                        partyType: v.purchasePartyType || 'Customer', dealerName: v.purchaseDealerName || '',
+                        customerName: v.purchaseCustomerName || '', customerMobile: v.purchaseCustomerMobile ? String(v.purchaseCustomerMobile) : '',
+                        price: v.purchasePrice || '', remarks: v.purchaseRemarks || ''
+                    });
+                    setTempDocs(v.purchaseDocs || []);
+                    setView('purchase');
+                } else if (detailTab === 'sale') {
+                    setForm({
+                        isEdit: true, vehicleId: v.id, vehicleLabel: `${v.number} - ${v.model}`,
+                        number: v.number, model: v.model,
+                        partyType: v.salePartyType || 'Customer', dealerName: v.saleDealerName || '',
+                        customerName: v.saleCustomerName || '', customerMobile: v.saleCustomerMobile ? String(v.saleCustomerMobile) : '',
+                        price: v.salePrice || '', remarks: v.saleRemarks || ''
+                    });
+                    setTempDocs(v.saleDocs || []);
+                    setView('sale');
+                }
+                window.scrollTo(0, 0);
+            };
+
+            // --- APP ACTIONS ---
+            const submitPurchase = async (e) => {
+                e.preventDefault();
+                if (form.customerMobile && String(form.customerMobile).length !== 10) return alert("Mobile must be 10 digits");
+                if (form.partyType === 'Dealer' && !form.dealerName) return alert("Please enter Dealer Name");
+                setProcessing(true); setLoadingMsg(tempDocs.length > 0 ? 'Uploading Images & Saving...' : 'Saving Details...');
+                try { 
+                    if (form.isEdit) await runScript('apiUpdatePurchase', { ...form, docs: tempDocs }); 
+                    else await runScript('apiPurchaseVehicle', { ...form, docs: tempDocs }); 
+                    await resetAndGoHome(); 
+                } catch(e) { alert("Error saving: " + e.message); }
+                setProcessing(false);
+            };
+
+            const submitSale = async (e) => {
+                e.preventDefault();
+                if (form.customerMobile && String(form.customerMobile).length !== 10) return alert("Mobile must be 10 digits");
+                if (form.partyType === 'Dealer' && !form.dealerName) return alert("Please enter Dealer Name");
+                setProcessing(true); setLoadingMsg(tempDocs.length > 0 ? 'Uploading Images & Saving...' : 'Saving Details...');
+                try {
+                    const payload = { ...form, docs: tempDocs };
+                    if (!payload.vehicleId) payload.number = form.vehicleLabel.split(' - ')[0].trim();
+                    if (form.isEdit) await runScript('apiUpdateSale', payload);
+                    else await runScript('apiSellVehicle', payload);
+                    await resetAndGoHome();
+                } catch(e) { alert("Error saving: " + e.message); }
+                setProcessing(false);
+            };
+
+            const handleDelete = async (id) => {
+                if(confirm("Are you sure you want to completely delete this entry?")) {
+                    setProcessing(true);
+                    try { await runScript('apiDeleteVehicle', id); await resetAndGoHome(); } 
+                    catch(e) { alert("Error deleting: " + e.message); }
+                    setProcessing(false);
+                }
+            };
+
+            const handleAppLogout = () => {
+                localStorage.removeItem('master_app_pin');
+                setVehicles([]);
+                setIsLocked(true);
+                setMasterPin('');
+            };
+
+            // ==========================================
+            // RENDERERS
+            // ==========================================
+
+            // 1. PIN LOCK SCREEN
+            if (isLocked) {
+                return (
+                    <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 fade-in relative overflow-hidden">
+                        {/* Decorative Background */}
+                        <div className="absolute top-0 left-0 w-full h-1/2 bg-blue-600/20 blur-3xl rounded-b-full"></div>
+                        
+                        <div className="z-10 flex flex-col items-center w-full max-w-xs px-6">
+                            <div className="text-blue-400 mb-6 bg-slate-800 p-4 rounded-2xl shadow-xl border border-slate-700">
+                                {Icons.Lock}
+                            </div>
+                            <h2 className="text-white font-bold text-2xl tracking-widest mb-2">APP LOCKED</h2>
+                            <p className="text-slate-400 text-sm mb-10">Enter 4-digit PIN to continue</p>
+                            
+                            {/* Hidden Input field for mobile keyboard */}
+                            <input 
+                                type="tel" 
+                                value={masterPin} 
+                                onChange={(e) => setMasterPin(e.target.value.replace(/\D/g, '').slice(0, 4))} 
+                                className="absolute opacity-0 w-full h-full inset-0 z-50 cursor-pointer" 
+                                autoFocus
+                            />
+
+                            {/* Visual Dots */}
+                            <div className="flex gap-4 mb-12 relative z-0 pointer-events-none">
+                                <div className={`pin-dot ${masterPin.length >= 1 ? 'filled bg-blue-500' : 'bg-slate-700'}`}></div>
+                                <div className={`pin-dot ${masterPin.length >= 2 ? 'filled bg-blue-500' : 'bg-slate-700'}`}></div>
+                                <div className={`pin-dot ${masterPin.length >= 3 ? 'filled bg-blue-500' : 'bg-slate-700'}`}></div>
+                                <div className={`pin-dot ${masterPin.length >= 4 ? 'filled bg-blue-500' : 'bg-slate-700'}`}></div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 2. LOADING SCREEN
+            if (loading) return <div className="min-h-screen w-full flex flex-col items-center justify-center text-blue-600 font-bold bg-slate-50"><div className="security-spinner"></div>Loading Data...</div>;
+
+            // 3. HOME VIEW
+            if (view === 'home') {
+                const filteredVehicles = (vehicles || []).filter(v => v.number?.toLowerCase().includes(searchQuery.toLowerCase()) || v.model?.toLowerCase().includes(searchQuery.toLowerCase()));
+                return (
+                    <div className="w-full max-w-md mx-auto bg-slate-50 min-h-screen flex flex-col fade-in pb-10 shadow-lg">
+                        <div className="bg-white p-4 shadow-sm sticky top-0 z-10">
+                            <div className="flex justify-between items-center mb-4">
+                                <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">{Icons.Car} Auto Manager</h1>
+                                <button onClick={handleAppLogout} className="text-slate-400 p-2 bg-slate-50 rounded-full active:bg-slate-200 transition-colors" title="Lock App">{Icons.Lock}</button>
+                            </div>
+                            <div className="relative"><span className="absolute left-4 top-3.5 text-gray-400">{Icons.Search}</span><input className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-100 border-none font-medium text-slate-800 placeholder-gray-400" placeholder="Search Vehicle..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/></div>
+                        </div>
+
+                        <div className="p-4 grid grid-cols-2 gap-4 mt-2">
+                            <button onClick={()=>{setForm(initialForm); setView('purchase'); window.scrollTo(0,0);}} className="bg-purple-600 active:bg-purple-700 text-white p-4 rounded-2xl flex flex-col items-center justify-center shadow-md gap-2 transform active:scale-95 transition-transform"><div className="bg-white/20 p-3 rounded-full">{Icons.ArrowDown}</div><span className="font-bold text-lg tracking-wide">Purchase</span></button>
+                            <button onClick={()=>{setForm(initialForm); setView('sale'); window.scrollTo(0,0);}} className="bg-green-600 active:bg-green-700 text-white p-4 rounded-2xl flex flex-col items-center justify-center shadow-md gap-2 transform active:scale-95 transition-transform"><div className="bg-white/20 p-3 rounded-full">{Icons.ArrowUp}</div><span className="font-bold text-lg tracking-wide">Sale</span></button>
+                        </div>
+
+                        <div className="px-4 flex-1 mt-2">
+                            <h2 className="text-xs font-bold text-gray-400 mb-3 ml-1 uppercase tracking-wider">Recent Vehicles</h2>
+                            <div className="space-y-3">
+                                {filteredVehicles.length === 0 ? (<div className="text-center p-8 text-gray-400 font-medium">No vehicles found.</div>) : (
+                                    filteredVehicles.map(v => (
+                                        <div key={v.id} onClick={()=>{setSelectedVehicle(v); setDetailTab('purchase'); setView('details'); window.scrollTo(0, 0);}} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center active:bg-slate-50 transition-colors">
+                                            <div><h3 className="font-bold text-lg text-slate-800 uppercase">{v.number}</h3><p className="text-xs text-gray-500 font-medium">{v.model}</p></div>
+                                            <div className="text-right"><span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-1 ${v.status === 'Sold' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}`}>{v.status}</span><p className="text-sm font-bold text-slate-600">₹{Number(v.status === 'Sold' ? v.salePrice : v.purchasePrice).toLocaleString()}</p></div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 4. PURCHASE VIEW
+            if (view === 'purchase') {
+                return (
+                    <div className="w-full max-w-md mx-auto bg-white min-h-screen flex flex-col fade-in shadow-lg">
+                        <div className="p-4 border-b flex items-center gap-3 sticky top-0 bg-white z-10 shadow-sm"><button type="button" onClick={()=>setView('home')} className="text-slate-500 active:scale-90 transition-transform">{Icons.Back}</button><h1 className="text-xl font-bold text-purple-700">{form.isEdit ? 'Edit Purchase' : 'New Purchase'}</h1></div>
+                        <form onSubmit={submitPurchase} className="p-5 flex-1 flex flex-col gap-5 pb-24">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Vehicle Details</label>
+                                <input required placeholder="Vehicle Number (e.g. UP80CD1234)" className="w-full p-3 rounded-lg border uppercase font-bold text-slate-800 focus:border-purple-500 bg-white" value={form.number} onChange={e=>setForm({...form, number:e.target.value})}/>
+                                <input required placeholder="Model Name (e.g. Splendor Plus)" className="w-full p-3 rounded-lg border text-slate-800 focus:border-purple-500 bg-white" value={form.model} onChange={e=>setForm({...form, model:e.target.value})}/>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Purchased From</label>
+                                <select className="w-full p-3 rounded-lg border font-bold text-purple-700 focus:border-purple-500 bg-white" value={form.partyType} onChange={e=>setForm({...form, partyType:e.target.value, dealerName:''})}><option value="Customer">Direct Customer</option><option value="Dealer">Via Dealer</option></select>
+                                {form.partyType === 'Dealer' && (<div className="mt-2"><input list="dealer-list" placeholder="Dealer Name *" required className="w-full p-3 rounded-lg border border-purple-200 text-slate-800 focus:border-purple-500 bg-purple-50" value={form.dealerName} onChange={e=>setForm({...form, dealerName:e.target.value})}/><datalist id="dealer-list">{dealerSuggestions.map(d => <option key={d} value={d} />)}</datalist></div>)}
+                                <div className="space-y-3 pt-2">
+                                    <input required placeholder="Customer (Swami) Name *" className="w-full p-3 rounded-lg border text-slate-800 focus:border-purple-500 bg-white" value={form.customerName} onChange={e=>setForm({...form, customerName:e.target.value})}/>
+                                    <input type="tel" placeholder="Customer Mobile (Optional)" className="w-full p-3 rounded-lg border text-slate-800 focus:border-purple-500 bg-white" value={form.customerMobile} onChange={e=>handleMobile(e.target.value, setForm, form, 'customerMobile')}/>
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Deal & Documents</label>
+                                <div className="relative"><span className="absolute left-4 top-3 text-slate-500 font-bold">₹</span><input required type="number" placeholder="Purchase Price" className="w-full pl-8 pr-4 py-3 rounded-lg border font-bold text-slate-800 focus:border-purple-500 bg-white text-lg" value={form.price} onChange={e=>setForm({...form, price:e.target.value})}/></div>
+                                <textarea placeholder="Remarks (Optional)" className="w-full p-3 rounded-lg border text-slate-800 focus:border-purple-500 bg-white text-sm" rows="2" value={form.remarks} onChange={e=>setForm({...form, remarks:e.target.value})}></textarea>
+                                <div className="bg-white border rounded-lg p-2 space-y-2 mt-2">
+                                    <div className="flex gap-2 items-center"><div className="relative bg-slate-100 p-2 rounded-lg text-slate-600 flex-shrink-0"><input type="file" id="fileInput" onChange={handleFile} className="absolute inset-0 opacity-0 w-full h-full"/>{Icons.Camera}</div><input placeholder="Doc/Pic Name" className="flex-1 text-sm outline-none bg-transparent" value={docName} onChange={e=>setDocName(e.target.value)}/><button type="button" onClick={addDoc} className="bg-purple-600 active:bg-purple-800 text-white px-4 py-2 rounded-lg text-sm font-bold">Add</button></div>
+                                    {tempDocs.length > 0 && (<div className="flex flex-wrap gap-2 pt-2 border-t mt-2">{tempDocs.map((d,i) => (<span key={i} className="text-xs bg-purple-50 text-purple-700 px-3 py-1.5 rounded-full border border-purple-100 flex items-center gap-2 font-medium">{d.name} <button type="button" onClick={()=>delDoc(i)} className="text-red-500 font-bold text-sm leading-none">×</button></span>))}</div>)}
+                                </div>
+                            </div>
+                            <div className="mt-4"><button disabled={processing} className={`w-full text-white py-4 rounded-xl font-bold text-lg shadow-lg ${processing ? 'bg-purple-400' : 'bg-purple-600 active:bg-purple-700'}`}>{processing ? loadingMsg : (form.isEdit ? 'Update Purchase' : 'Save Purchase Entry')}</button></div>
+                        </form>
+                    </div>
+                );
+            }
+
+            // 5. SALE VIEW
+            if (view === 'sale') {
+                const stockVehicles = (vehicles || []).filter(v => v.status === 'In Stock');
+                return (
+                    <div className="w-full max-w-md mx-auto bg-white min-h-screen flex flex-col fade-in shadow-lg">
+                        <div className="p-4 border-b flex items-center gap-3 sticky top-0 bg-white z-10 shadow-sm"><button type="button" onClick={()=>setView('home')} className="text-slate-500 active:scale-90 transition-transform">{Icons.Back}</button><h1 className="text-xl font-bold text-green-700">{form.isEdit ? 'Edit Sale' : 'New Sale'}</h1></div>
+                        <form onSubmit={submitSale} className="p-5 flex-1 flex flex-col gap-5 pb-24">
+                            {form.isEdit ? (
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3"><label className="text-xs font-bold text-gray-500 uppercase">Editing Vehicle</label><div className="font-bold text-lg text-slate-800 bg-white p-3 rounded-lg border">{form.number} - {form.model}</div></div>
+                            ) : (
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Vehicle Details</label>
+                                    <input list="stock-vehicles-list" required placeholder="-- Type or Select Vehicle --" className="w-full p-3 rounded-lg border font-bold text-slate-800 focus:border-green-500 bg-white uppercase" value={form.vehicleLabel !== undefined ? form.vehicleLabel : ''} onChange={e => { const val = e.target.value; const matched = stockVehicles.find(v => `${v.number} - ${v.model}` === val || v.number === val); setForm({...form, vehicleLabel: val, vehicleId: matched ? matched.id : '', number: matched ? matched.number : val, model: matched ? matched.model : form.model}); }}/>
+                                    <datalist id="stock-vehicles-list">{stockVehicles.map(v => (<option key={v.id} value={`${v.number} - ${v.model}`} />))}</datalist>
+                                    {!form.vehicleId && form.vehicleLabel && (<div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg fade-in"><p className="text-xs text-orange-600 font-bold mb-2">⚠️ Not in stock. A new direct sale record will be created.</p><input required placeholder="Enter Vehicle Model *" className="w-full p-2 rounded border text-sm text-slate-800 focus:border-orange-400" value={form.model} onChange={e=>setForm({...form, model: e.target.value})} /></div>)}
+                                </div>
+                            )}
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Sold To</label>
+                                <select className="w-full p-3 rounded-lg border font-bold text-green-700 focus:border-green-500 bg-white" value={form.partyType} onChange={e=>setForm({...form, partyType:e.target.value, dealerName:''})}><option value="Customer">Direct Customer</option><option value="Dealer">Via Dealer</option></select>
+                                {form.partyType === 'Dealer' && (<div className="mt-2"><input list="dealer-list-sale" required placeholder="Dealer Name *" className="w-full p-3 rounded-lg border border-green-200 text-slate-800 focus:border-green-500 bg-green-50" value={form.dealerName} onChange={e=>setForm({...form, dealerName:e.target.value})}/><datalist id="dealer-list-sale">{dealerSuggestions.map(d => <option key={d} value={d} />)}</datalist></div>)}
+                                <div className="space-y-3 pt-2"><input required placeholder="Customer (Buyer) Name *" className="w-full p-3 rounded-lg border text-slate-800 focus:border-green-500 bg-white" value={form.customerName} onChange={e=>setForm({...form, customerName:e.target.value})}/><input type="tel" placeholder="Mobile Number (Optional)" className="w-full p-3 rounded-lg border text-slate-800 focus:border-green-500 bg-white" value={form.customerMobile} onChange={e=>handleMobile(e.target.value, setForm, form, 'customerMobile')}/></div>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Deal & Documents</label>
+                                <div className="relative"><span className="absolute left-4 top-3 text-slate-500 font-bold">₹</span><input required type="number" placeholder="Sale Price" className="w-full pl-8 pr-4 py-3 rounded-lg border font-bold text-slate-800 focus:border-green-500 bg-white text-lg" value={form.price} onChange={e=>setForm({...form, price:e.target.value})}/></div>
+                                <textarea placeholder="Remarks (Optional)" className="w-full p-3 rounded-lg border text-slate-800 focus:border-green-500 bg-white text-sm" rows="2" value={form.remarks} onChange={e=>setForm({...form, remarks:e.target.value})}></textarea>
+                                <div className="bg-white border rounded-lg p-2 space-y-2 mt-2">
+                                    <div className="flex gap-2 items-center"><div className="relative bg-slate-100 p-2 rounded-lg text-slate-600 flex-shrink-0"><input type="file" id="fileInput" onChange={handleFile} className="absolute inset-0 opacity-0 w-full h-full"/>{Icons.Camera}</div><input placeholder="Doc/Pic Name" className="flex-1 text-sm outline-none bg-transparent" value={docName} onChange={e=>setDocName(e.target.value)}/><button type="button" onClick={addDoc} className="bg-green-600 active:bg-green-800 text-white px-4 py-2 rounded-lg text-sm font-bold">Add</button></div>
+                                    {tempDocs.length > 0 && (<div className="flex flex-wrap gap-2 pt-2 border-t mt-2">{tempDocs.map((d,i) => (<span key={i} className="text-xs bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-100 flex items-center gap-2 font-medium">{d.name} <button type="button" onClick={()=>delDoc(i)} className="text-red-500 font-bold text-sm leading-none">×</button></span>))}</div>)}
+                                </div>
+                            </div>
+                            <div className="mt-4"><button disabled={processing} className={`w-full text-white py-4 rounded-xl font-bold text-lg shadow-lg ${processing ? 'bg-green-400' : 'bg-green-600 active:bg-green-700'}`}>{processing ? loadingMsg : (form.isEdit ? 'Update Sale' : 'Save Sale Entry')}</button></div>
+                        </form>
+                    </div>
+                );
+            }
+
+            // 6. DETAILS VIEW
+            if (view === 'details' && selectedVehicle) {
+                const v = selectedVehicle; const isSold = v.status === 'Sold';
+                return (
+                    <div className="w-full max-w-md mx-auto bg-slate-50 min-h-screen flex flex-col fade-in pb-10 shadow-lg">
+                        <div className="bg-slate-800 text-white p-5 pt-6 pb-8 rounded-b-3xl shadow-lg relative">
+                            <button onClick={()=>setView('home')} className="absolute top-4 left-4 text-white/80 active:text-white p-2 active:scale-90 transition-transform">{Icons.Back}</button>
+                            <div className="absolute top-4 right-4 flex gap-2">
+                                <button disabled={processing} onClick={()=>handleEdit(v)} className="text-blue-400 active:text-blue-300 p-2 active:scale-90 transition-transform">{Icons.Edit}</button>
+                                <button disabled={processing} onClick={()=>handleDelete(v.id)} className="text-red-400 active:text-red-300 p-2 active:scale-90 transition-transform">{Icons.Trash}</button>
+                            </div>
+                            <div className="text-center mt-6"><h1 className="text-3xl font-black tracking-widest uppercase mb-1">{v.number}</h1><p className="text-slate-300 font-medium mb-3">{v.model}</p><span className={`inline-block px-4 py-1.5 rounded-full text-sm font-bold shadow ${isSold ? 'bg-green-500 text-white' : 'bg-purple-500 text-white'}`}>{v.status}</span></div>
+                        </div>
+                        <div className="px-4 -mt-5 relative z-10"><div className="bg-white rounded-xl shadow p-1 flex"><button onClick={()=>setDetailTab('purchase')} className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors ${detailTab==='purchase' ? 'bg-purple-100 text-purple-700' : 'text-slate-400'}`}>Purchase</button><button onClick={()=>setDetailTab('sale')} disabled={!isSold} className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors ${detailTab==='sale' ? 'bg-green-100 text-green-700' : isSold ? 'text-slate-400' : 'text-slate-200'}`}>Sale {!isSold && '(Pending)'}</button></div></div>
+                        <div className="p-5 flex-1 mt-2 space-y-4">
+                            {detailTab === 'purchase' && (
+                                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm fade-in space-y-4">
+                                    <div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Purchased From</p><p className="font-bold text-lg text-slate-800">{v.purchaseCustomerName || 'N/A'} {v.purchasePartyType === 'Dealer' && <span className="text-sm font-normal text-purple-600 bg-purple-50 px-2 py-0.5 rounded ml-2 border border-purple-100 block mt-1 w-fit">Via {v.purchaseDealerName}</span>}</p>{v.purchaseCustomerMobile && <p className="text-gray-500 mt-2 flex items-center gap-1 text-sm">📞 {v.purchaseCustomerMobile}</p>}</div><hr className="border-slate-100"/>
+                                    <div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Purchase Price</p><p className="font-black text-2xl text-slate-800">₹{Number(v.purchasePrice).toLocaleString()}</p></div>
+                                    {v.purchaseRemarks && (<><hr className="border-slate-100"/><div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Remarks</p><p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">{v.purchaseRemarks}</p></div></>)}<hr className="border-slate-100"/>
+                                    <div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Documents</p>{v.purchaseDocs && v.purchaseDocs.length > 0 ? (<div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scroll-smooth">{v.purchaseDocs.map((d, i) => (<div key={i} onClick={()=>window.open(d.url, "_blank")} className="flex-shrink-0 w-24 active:opacity-75 transition-opacity"><div className="h-24 w-24 bg-slate-100 rounded-xl border object-cover mb-1 overflow-hidden flex items-center justify-center"><img src={d.url} className="w-full h-full object-cover" alt="doc"/></div><p className="text-[10px] text-center font-medium text-slate-600 leading-tight truncate px-1">{d.name}</p></div>))}</div>) : <p className="text-sm text-gray-400 italic">No documents uploaded.</p>}</div>
+                                </div>
+                            )}
+                            {detailTab === 'sale' && isSold && (
+                                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm fade-in space-y-4">
+                                    <div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Sold To</p><p className="font-bold text-lg text-slate-800">{v.saleCustomerName || 'N/A'}{v.salePartyType === 'Dealer' && <span className="text-sm font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded ml-2 border border-green-100 block mt-1 w-fit">Via {v.saleDealerName}</span>}</p>{v.saleCustomerMobile && <p className="text-gray-500 mt-2 flex items-center gap-1 text-sm">📞 {v.saleCustomerMobile}</p>}</div><hr className="border-slate-100"/>
+                                    <div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Sale Price</p><p className="font-black text-2xl text-slate-800">₹{Number(v.salePrice).toLocaleString()}</p><div className={`mt-2 inline-flex items-center gap-1 px-3 py-1 rounded-md text-sm font-bold ${v.salePrice - v.purchasePrice >= 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>Margin: {v.salePrice - v.purchasePrice >= 0 ? '+' : ''}₹{(v.salePrice - v.purchasePrice).toLocaleString()}</div></div>
+                                    {v.saleRemarks && (<><hr className="border-slate-100"/><div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Remarks</p><p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">{v.saleRemarks}</p></div></>)}<hr className="border-slate-100"/>
+                                    <div><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Documents</p>{v.saleDocs && v.saleDocs.length > 0 ? (<div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scroll-smooth">{v.saleDocs.map((d, i) => (<div key={i} onClick={()=>window.open(d.url, "_blank")} className="flex-shrink-0 w-24 active:opacity-75 transition-opacity"><div className="h-24 w-24 bg-slate-100 rounded-xl border object-cover mb-1 overflow-hidden flex items-center justify-center"><img src={d.url} className="w-full h-full object-cover" alt="doc"/></div><p className="text-[10px] text-center font-medium text-slate-600 leading-tight truncate px-1">{d.name}</p></div>))}</div>) : <p className="text-sm text-gray-400 italic">No documents uploaded.</p>}</div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+            return null;
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
